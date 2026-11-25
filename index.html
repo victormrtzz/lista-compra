@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>¿Puedes ir a comprar hoy?</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="¿Vas a comprar?">
+<meta name="theme-color" content="#1f7a4d">
+<link rel="apple-touch-icon" href="icono.png">
+<link rel="icon" href="icono.png">
+<style>
+  :root{
+    --verde:#1f7a4d; --verde-claro:#e6f4ec; --fondo:#f6f5f1; --tarjeta:#fff;
+    --texto:#1d1d1b; --suave:#6b6b66; --linea:#e4e2db;
+    --merca:#0b8a3e; --dia:#d8232a; --sombra:0 1px 3px rgba(0,0,0,.08);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;background:var(--fondo);color:var(--texto);
+    font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,sans-serif;font-size:18px}
+  button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
+  input,select{font:inherit;font-size:18px}
+  header{position:sticky;top:0;z-index:5;background:var(--verde);color:#fff;
+    padding:calc(env(safe-area-inset-top) + 10px) 16px 12px}
+  header h1{margin:0;font-size:22px;font-weight:700;letter-spacing:-.2px}
+  #aviso{background:#fff4d6;color:#6b4e00;font-size:15px;padding:8px 16px;display:none}
+  main{padding:12px 12px calc(110px + env(safe-area-inset-bottom))}
+  .vista{display:none}.vista.activa{display:block}
+
+  /* Barra de añadir */
+  .anadir{display:flex;gap:8px;align-items:center;position:relative}
+  .anadir input{flex:1;min-width:0;height:56px;border:2px solid var(--linea);border-radius:14px;
+    padding:0 14px;background:#fff;outline:none}
+  .anadir input:focus{border-color:var(--verde)}
+  .btn-redondo{width:56px;height:56px;border-radius:14px;display:grid;place-items:center;font-size:26px;flex:none}
+  .btn-mas{background:var(--verde);color:#fff;font-size:32px;font-weight:600}
+  .btn-micro{background:#fff;border:2px solid var(--linea)}
+  .btn-micro.escuchando{background:var(--dia);border-color:var(--dia);color:#fff;animation:latido 1s infinite}
+  @keyframes latido{50%{transform:scale(1.06)}}
+  .sugerencias{position:absolute;left:0;right:0;top:62px;background:#fff;border-radius:14px;
+    box-shadow:0 8px 24px rgba(0,0,0,.15);overflow:hidden;z-index:4;display:none}
+  .sugerencias button{display:flex;width:100%;text-align:left;padding:14px 16px;border-bottom:1px solid var(--linea);gap:10px;align-items:center}
+  .sugerencias button:last-child{border-bottom:0}
+  .sugerencias small{color:var(--suave);margin-left:auto;font-size:14px}
+
+  /* Filtro de súper */
+  .filtro{display:flex;background:#fff;border-radius:14px;padding:4px;margin:12px 0;box-shadow:var(--sombra)}
+  .filtro button{flex:1 1 auto;padding:12px 6px;border-radius:10px;font-weight:600;font-size:16px;color:var(--suave);white-space:nowrap}
+  .filtro button.activo{background:var(--verde);color:#fff}
+  .filtro button[data-super="mercadona"].activo{background:var(--merca)}
+  .filtro button[data-super="dia"].activo{background:var(--dia)}
+  .filtro .n{font-weight:400;opacity:.8}
+
+  /* Lista */
+  .seccion{margin:14px 0 4px;font-size:15px;font-weight:700;color:var(--suave);text-transform:uppercase;letter-spacing:.4px;padding:0 4px}
+  .grupo{background:var(--tarjeta);border-radius:14px;box-shadow:var(--sombra);overflow:hidden}
+  .item{display:flex;align-items:center;min-height:62px;border-bottom:1px solid var(--linea)}
+  .item:last-child{border-bottom:0}
+  .item .toque{flex:1;display:flex;align-items:center;gap:14px;padding:10px 6px 10px 14px;text-align:left;min-width:0}
+  .caja{width:32px;height:32px;border-radius:9px;border:2.5px solid #b9b7ae;flex:none;display:grid;place-items:center;font-size:20px;color:#fff}
+  .item.hecho .caja{background:var(--verde);border-color:var(--verde)}
+  .nombre{font-size:19px;overflow-wrap:anywhere}
+  .item.hecho .nombre{text-decoration:line-through;color:#a3a19a}
+  .cant{font-weight:700;color:var(--verde);margin-right:4px}
+  .etiqueta{font-size:12px;font-weight:700;color:#fff;border-radius:6px;padding:2px 7px;margin-left:8px;white-space:nowrap;vertical-align:2px}
+  .etiqueta.mercadona{background:var(--merca)}.etiqueta.dia{background:var(--dia)}
+  .item .mas{width:52px;align-self:stretch;font-size:24px;color:var(--suave)}
+  .vacio{text-align:center;color:var(--suave);padding:40px 20px;font-size:18px;line-height:1.5}
+  .vacio .grande{font-size:54px;display:block;margin-bottom:8px}
+  .btn-ancho{display:block;width:100%;padding:16px;border-radius:14px;font-weight:600;margin-top:18px;font-size:18px}
+  .btn-quitar{background:#fff;border:2px solid var(--linea);color:var(--texto)}
+
+  /* Balda */
+  .baldas{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:10px}
+  .bote{position:relative;background:#fff;border-radius:16px;box-shadow:var(--sombra);padding:14px 8px 12px;
+    text-align:center;min-height:104px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;border:2.5px solid transparent}
+  .bote .emo{font-size:32px;line-height:1}
+  .bote .nom{font-size:16px;line-height:1.2;overflow-wrap:anywhere}
+  .bote.en-lista{border-color:var(--verde);background:var(--verde-claro)}
+  .bote .check{position:absolute;top:6px;right:8px;color:var(--verde);font-weight:800;font-size:18px}
+  .bote .quitar{position:absolute;top:-8px;right:-8px;width:30px;height:30px;border-radius:50%;background:var(--dia);color:#fff;font-weight:700;display:none}
+  .editando .bote .quitar{display:block}
+  .editando .bote .check{display:none}
+  .bote.nuevo{border:2.5px dashed #b9b7ae;box-shadow:none;background:transparent;color:var(--suave)}
+  .ayuda{color:var(--suave);font-size:16px;margin:4px 4px 12px;line-height:1.4}
+  .fila{display:flex;justify-content:space-between;align-items:center;gap:10px}
+  .btn-texto{color:var(--verde);font-weight:600;padding:8px 4px;font-size:17px}
+
+  /* Pestañas abajo */
+  nav{position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:1px solid var(--linea);
+    display:flex;padding-bottom:env(safe-area-inset-bottom);z-index:6}
+  nav button{flex:1;padding:10px 0 12px;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:15px;font-weight:600;color:var(--suave)}
+  nav button .ico{font-size:28px}
+  nav button.activo{color:var(--verde)}
+  .globo{background:var(--dia);color:#fff;border-radius:10px;font-size:13px;padding:0 7px;margin-left:4px}
+
+  /* Ventana de detalles */
+  .fondo-modal{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:10;display:none;align-items:flex-end}
+  .fondo-modal.abierto{display:flex}
+  .modal{background:#fff;width:100%;border-radius:20px 20px 0 0;padding:20px 18px calc(20px + env(safe-area-inset-bottom));max-height:90vh;overflow:auto}
+  .modal h2{margin:0 0 16px;font-size:24px;overflow-wrap:anywhere}
+  .modal label{display:block;font-size:15px;font-weight:700;color:var(--suave);margin:16px 0 8px;text-transform:uppercase;letter-spacing:.4px}
+  .opciones{display:flex;gap:8px;flex-wrap:wrap}
+  .opciones button{flex:1;min-width:30%;padding:14px 8px;border-radius:12px;border:2px solid var(--linea);font-weight:600;font-size:17px}
+  .opciones button.activo{border-color:var(--verde);background:var(--verde-claro);color:var(--verde)}
+  .opciones button.activo[data-v="mercadona"]{border-color:var(--merca);background:#e3f4ea;color:var(--merca)}
+  .opciones button.activo[data-v="dia"]{border-color:var(--dia);background:#fde8e8;color:var(--dia)}
+  .contador{display:flex;align-items:center;gap:14px}
+  .contador button{width:52px;height:52px;border-radius:12px;border:2px solid var(--linea);font-size:26px;font-weight:600}
+  .contador span{font-size:24px;font-weight:700;min-width:40px;text-align:center}
+  .modal select{width:100%;height:54px;border-radius:12px;border:2px solid var(--linea);padding:0 12px;background:#fff}
+  .acciones{display:grid;gap:10px;margin-top:22px}
+  .acciones button{padding:16px;border-radius:14px;font-weight:600;font-size:18px}
+  .ok{background:var(--verde);color:#fff}
+  .secundario{background:var(--fondo)}
+  .peligro{color:var(--dia);background:#fde8e8}
+
+  /* Fotos */
+  .foto{width:44px;height:44px;border-radius:8px;object-fit:contain;background:#fff;border:1px solid var(--linea);flex:none}
+  .item.hecho .foto{opacity:.45}
+  .bote .foto-g{width:64px;height:64px;object-fit:contain;border-radius:8px;background:#fff}
+  .detalle-prod{font-size:13px;color:var(--suave);display:block;margin-top:2px}
+
+  /* Buscador de productos */
+  .btn-buscar{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin-top:10px;padding:14px;
+    border-radius:14px;background:#fff;border:2px solid var(--verde);color:var(--verde);font-weight:700;font-size:17px}
+  .modal.grande{height:94vh;display:flex;flex-direction:column;padding-bottom:calc(10px + env(safe-area-inset-bottom))}
+  .modal.grande .cab{flex:none}
+  .modal .cerrar{float:right;font-size:28px;line-height:1;padding:0 4px;color:var(--suave)}
+  .busca{display:flex;gap:8px;margin-top:12px}
+  .busca input{flex:1;min-width:0;height:52px;border:2px solid var(--linea);border-radius:12px;padding:0 12px;outline:none}
+  .busca input:focus{border-color:var(--verde)}
+  .busca button{padding:0 16px;border-radius:12px;background:var(--verde);color:#fff;font-weight:700}
+  .chips{display:flex;gap:8px;overflow-x:auto;padding:12px 0 6px;scrollbar-width:none}
+  .chips::-webkit-scrollbar{display:none}
+  .chips button{flex:none;padding:9px 14px;border-radius:20px;background:var(--fondo);font-size:16px;font-weight:600}
+  .resultados{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;margin:4px -4px 0;padding:4px}
+  .rejilla{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .prod{background:#fff;border:2px solid var(--linea);border-radius:14px;padding:10px;display:flex;flex-direction:column;gap:6px;text-align:left;position:relative}
+  .prod img{width:100%;height:110px;object-fit:contain}
+  .prod .sinfoto{height:110px;display:grid;place-items:center;font-size:44px}
+  .prod .pn{font-size:15px;font-weight:600;line-height:1.25;overflow-wrap:anywhere}
+  .prod .pm{font-size:13px;color:var(--suave)}
+  .prod .pmas{margin-top:auto;padding:10px;border-radius:10px;background:var(--verde);color:#fff;font-weight:700;text-align:center}
+  .prod.puesto{border-color:var(--verde);background:var(--verde-claro)}
+  .prod.puesto .pmas{background:#fff;color:var(--verde)}
+  .estado{text-align:center;color:var(--suave);padding:26px 10px;line-height:1.5}
+  .tal-cual{width:100%;padding:14px;border-radius:12px;background:var(--fondo);font-weight:600;margin-bottom:10px;text-align:left}
+  .creditos{font-size:12px;color:var(--suave);text-align:center;padding:10px 0 2px}
+  .creditos a{color:var(--suave)}
+
+  #toast{position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom));transform:translateX(-50%) translateY(20px);
+    background:#222;color:#fff;padding:12px 18px;border-radius:14px;font-size:17px;opacity:0;transition:.25s;z-index:20;
+    max-width:90vw;text-align:center;pointer-events:none}
+  #toast.ver{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+<header><h1>¿Puedes ir a comprar hoy?</h1></header>
+<div id="aviso"></div>
+
+<main>
+  <!-- LISTA -->
+  <section id="vista-lista" class="vista activa">
+    <div class="anadir">
+      <input id="entrada" type="text" placeholder="¿Qué hace falta?" autocomplete="off" autocorrect="on" enterkeyhint="done" aria-label="Producto que hace falta">
+      <button class="btn-redondo btn-micro" id="micro" aria-label="Decirlo con la voz">🎤</button>
+      <button class="btn-redondo btn-mas" id="btn-anadir" aria-label="Añadir">+</button>
+      <div class="sugerencias" id="sugerencias"></div>
+    </div>
+    <button class="btn-buscar" id="btn-buscar">🔎 Buscar en Mercadona y Dia</button>
+    <div class="filtro" id="filtro">
+      <button data-super="todo" class="activo">Todo <span class="n"></span></button>
+      <button data-super="mercadona">Mercadona <span class="n"></span></button>
+      <button data-super="dia">Dia <span class="n"></span></button>
+    </div>
+    <div id="lista"></div>
+  </section>
+
+  <!-- BALDA -->
+  <section id="vista-balda" class="vista">
+    <div class="fila">
+      <p class="ayuda">Lo que compramos siempre. <b>Toca uno</b> para apuntarlo en la lista.</p>
+      <button class="btn-texto" id="btn-editar-balda">Editar</button>
+    </div>
+    <div id="balda"></div>
+  </section>
+</main>
+
+<nav>
+  <button data-vista="lista" class="activo"><span class="ico">🛒</span><span>Lista <span class="globo" id="globo" hidden></span></span></button>
+  <button data-vista="balda"><span class="ico">🧺</span><span>La balda</span></button>
+</nav>
+
+<div class="fondo-modal" id="modal-fondo"><div class="modal" id="modal"></div></div>
+<div id="toast"></div>
+
+<script type="module">
+/* ============================================================
+   CONFIGURACIÓN — esto es lo único que hay que rellenar
+   (te lo relleno yo cuando me pases los datos de Firebase)
+   ============================================================ */
+const FIREBASE = {
+  apiKey: "AIzaSyAY6JKU8nCIprbbG8336rSbVqypFkIdGts",
+  authDomain: "lista-compra-familia-aee26.firebaseapp.com",
+  projectId: "lista-compra-familia-aee26",
+  storageBucket: "lista-compra-familia-aee26.firebasestorage.app",
+  messagingSenderId: "665370798572",
+  appId: "1:665370798572:web:c06e3f07dc8be1536e38c9"
+};
+const FAMILIA = "mrlukcd1q6d2";
+/* ============================================================ */
+
+const SECCIONES = [
+  ["fruta","🍎","Fruta y verdura"],["pan","🥖","Panadería"],["carne","🥩","Carne"],
+  ["pescado","🐟","Pescado y marisco"],["charcuteria","🧀","Charcutería y quesos"],
+  ["lacteos","🥛","Lácteos y huevos"],["despensa","🥫","Despensa"],["desayuno","🍪","Desayuno y dulces"],
+  ["congelados","🧊","Congelados"],["bebidas","🥤","Bebidas"],["limpieza","🧽","Limpieza y hogar"],
+  ["higiene","🧴","Higiene y cuidado"],["bebe","🍼","Bebé"],["mascotas","🐾","Mascotas"],["otros","📦","Otros"]
+];
+const SEC = Object.fromEntries(SECCIONES.map(([k,e,n],i)=>[k,{emo:e,nombre:n,orden:i}]));
+const SUPERS = {cualquiera:"Cualquiera", mercadona:"Mercadona", dia:"Dia"};
+
+const CATALOGO_TXT = {
+  fruta:"plátanos,manzanas,naranjas,mandarinas,peras,uvas,fresas,kiwis,melón,sandía,piña,melocotones,nectarinas,ciruelas,cerezas,limones,aguacates,arándanos,frutos rojos,granada,tomates,tomates cherry,lechuga,ensalada en bolsa,rúcula,canónigos,cebollas,cebolleta,ajos,patatas,zanahorias,pimientos rojos,pimientos verdes,calabacín,berenjena,pepino,brócoli,coliflor,espinacas,judías verdes,champiñones,setas,puerros,calabaza,boniato,perejil,cilantro,maíz dulce,apio,rábanos,alcachofas",
+  pan:"pan,barra de pan,pan de molde,pan integral,pan sin corteza,pan de hamburguesa,pan de perritos,picos,colines,biscotes,pan rallado,tortillas de trigo,pan de pita",
+  carne:"pechuga de pollo,muslos de pollo,contramuslos de pollo,pollo entero,alitas de pollo,carne picada,filetes de ternera,ternera para guisar,lomo de cerdo,chuletas de cerdo,costillas,hamburguesas,salchichas,pechuga de pavo,chuletas de cordero,solomillo,albóndigas,secreto ibérico,cinta de lomo,carne de cocido",
+  pescado:"merluza,salmón,atún fresco,bacalao,dorada,lubina,sardinas,boquerones,gambas,langostinos,mejillones,almejas,calamares,sepia,pulpo,palitos de cangrejo,rape,emperador",
+  charcuteria:"jamón serrano,jamón cocido,pavo en lonchas,chorizo,salchichón,fuet,lomo embuchado,bacon,mortadela,sobrasada,paté,salmón ahumado,queso en lonchas,queso rallado,queso curado,queso semicurado,queso fresco,queso de untar,queso de burgos,mozzarella,queso para pizza",
+  lacteos:"leche,leche entera,leche semidesnatada,leche desnatada,leche sin lactosa,bebida de avena,bebida de soja,huevos,yogures,yogures naturales,yogures griegos,yogures de sabores,yogures bebibles,natillas,flan,arroz con leche,mantequilla,margarina,nata para cocinar,nata para montar,batidos,kéfir,cuajada,petit suisse",
+  despensa:"aceite de oliva,aceite de girasol,vinagre,sal,azúcar,harina,arroz,pasta,macarrones,espaguetis,fideos,lentejas,garbanzos,alubias,legumbres cocidas,atún en lata,sardinas en lata,mejillones en lata,tomate frito,tomate triturado,mayonesa,kétchup,mostaza,salsa de soja,pimienta,orégano,pimentón,comino,especias,caldo de pollo,caldo de verduras,sopa,aceitunas,pepinillos,maíz en lata,pimientos del piquillo,espárragos,levadura,frutos secos,patatas fritas,snacks,palomitas,pan tostado,tomate concentrado,pasta de lasaña,cuscús,quinoa",
+  desayuno:"café,café molido,café en cápsulas,café soluble,té,infusiones,manzanilla,cacao en polvo,cereales,copos de avena,galletas,galletas maría,magdalenas,bizcocho,croissants,mermelada,miel,chocolate,crema de cacao,bollería,tortitas de arroz,gominolas,chicles",
+  congelados:"helado,pizza,pizza congelada,verduras congeladas,guisantes,croquetas,empanadillas,varitas de merluza,patatas congeladas,gambas congeladas,lasaña,san jacobos,nuggets,hielo,masa de hojaldre,masa de pizza,espinacas congeladas",
+  bebidas:"agua,agua con gas,refrescos,coca-cola,cerveza,cerveza sin alcohol,vino tinto,vino blanco,cava,zumo,zumo de naranja,gaseosa,tónica,bebida isotónica,horchata,refresco de limón,refresco de naranja",
+  limpieza:"papel higiénico,papel de cocina,servilletas,lavavajillas,pastillas lavavajillas,detergente,suavizante,lejía,friegasuelos,limpiacristales,multiusos,quitagrasas,estropajos,bayetas,bolsas de basura,papel de aluminio,papel film,papel de horno,ambientador,guantes,pilas,bombillas,insecticida,quitamanchas,sal para lavavajillas",
+  higiene:"champú,acondicionador,gel de ducha,jabón de manos,pasta de dientes,cepillo de dientes,enjuague bucal,seda dental,desodorante,compresas,tampones,cuchillas de afeitar,espuma de afeitar,crema hidratante,colonia,toallitas,bastoncillos,algodón,pañuelos,protector solar,tiritas,laca,gomina",
+  bebe:"pañales,toallitas de bebé,potitos,leche de continuación,papillas",
+  mascotas:"comida de perro,comida de gato,arena para gatos,premios para perro,latas de gato"
+};
+const CATALOGO = [];
+for (const [sec, txt] of Object.entries(CATALOGO_TXT))
+  for (const n of txt.split(",")) CATALOGO.push({nombre:n, seccion:sec});
+
+/* ---------- utilidades ---------- */
+const $ = s => document.querySelector(s);
+const norm = s => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/\s+/g," ").trim();
+const capital = s => s.charAt(0).toUpperCase() + s.slice(1);
+function el(tag, attrs={}, ...hijos){
+  const e = document.createElement(tag);
+  for (const [k,v] of Object.entries(attrs)){
+    if (k==="class") e.className=v; else if (k==="text") e.textContent=v;
+    else if (k.startsWith("on")) e.addEventListener(k.slice(2), v);
+    else if (v!==false && v!=null) e.setAttribute(k, v===true?"":v);
+  }
+  for (const h of hijos) if (h!=null) e.append(h);
+  return e;
+}
+let toastT;
+function toast(msg){ const t=$("#toast"); t.textContent=msg; t.classList.add("ver"); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove("ver"),2200); }
+function vibrar(){ try{ navigator.vibrate && navigator.vibrate(15);}catch(e){} }
+
+/* Adivina sección a partir del nombre */
+function buscarEnCatalogo(nombre){
+  const n = norm(nombre);
+  const mem = memoria.get(n); if (mem) return mem;
+  let exacto = CATALOGO.find(p=>norm(p.nombre)===n);
+  if (exacto) return {seccion:exacto.seccion};
+  // singular/plural sencillo
+  const alt = n.endsWith("s") ? n.slice(0,-1) : n+"s";
+  exacto = CATALOGO.find(p=>norm(p.nombre)===alt || norm(p.nombre)===n.replace(/es$/,""));
+  if (exacto) return {seccion:exacto.seccion};
+  // el producto del catálogo más largo que aparece dentro de lo escrito
+  let mejor=null;
+  for (const p of CATALOGO){
+    const pn = norm(p.nombre);
+    const re = new RegExp("(^|\\s)"+pn.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+"(s|es)?(\\s|$)");
+    if (re.test(n) && (!mejor || pn.length>norm(mejor.nombre).length)) mejor=p;
+  }
+  if (!mejor){ // primera palabra
+    const pal = n.split(" ")[0];
+    if (pal.length>=4) mejor = CATALOGO.find(p=>norm(p.nombre).split(" ")[0].startsWith(pal.replace(/s$/,"")));
+  }
+  return {seccion: mejor ? mejor.seccion : "otros"};
+}
+
+/* ---------- almacenamiento: Firebase o modo prueba ---------- */
+const usarFirebase = !!FIREBASE.apiKey;
+let BD;
+async function iniciarBD(){
+  if (usarFirebase){
+    const V="10.12.2";
+    const {initializeApp} = await import(`https://www.gstatic.com/firebasejs/${V}/firebase-app.js`);
+    const fs = await import(`https://www.gstatic.com/firebasejs/${V}/firebase-firestore.js`);
+    const app = initializeApp(FIREBASE);
+    let db;
+    try { db = fs.initializeFirestore(app,{localCache: fs.persistentLocalCache()}); }
+    catch(e){ db = fs.getFirestore(app); }
+    const col = n => fs.collection(db,"familias",FAMILIA,n);
+    BD = {
+      escuchar(n, cb){ fs.onSnapshot(col(n), s=>cb(s.docs.map(d=>({id:d.id,...d.data()}))), e=>{ console.error(e); aviso("No se puede conectar con la lista. Revisa internet."); }); },
+      anadir(n, obj){ return fs.addDoc(col(n), obj); },
+      cambiar(n, id, obj){ return fs.updateDoc(fs.doc(db,"familias",FAMILIA,n,id), obj); },
+      borrar(n, id){ return fs.deleteDoc(fs.doc(db,"familias",FAMILIA,n,id)); },
+      poner(n, id, obj){ return fs.setDoc(fs.doc(db,"familias",FAMILIA,n,id), obj, {merge:true}); }
+    };
+  } else {
+    aviso("Modo prueba: la lista solo se guarda en este móvil. Cuando conectemos Firebase será compartida.");
+    const oyentes={}, clave=n=>"compra_"+n;
+    const leer=n=>{ try{return JSON.parse(localStorage.getItem(clave(n))||"{}");}catch(e){return {};} };
+    const guardar=(n,d)=>{ try{localStorage.setItem(clave(n),JSON.stringify(d));}catch(e){} memoriaRAM[n]=d; avisar(n); };
+    const memoriaRAM={};
+    const datos=n=> memoriaRAM[n] || (memoriaRAM[n]=leer(n));
+    const avisar=n=>(oyentes[n]||[]).forEach(cb=>cb(Object.entries(datos(n)).map(([id,v])=>({id,...v}))));
+    BD = {
+      escuchar(n,cb){ (oyentes[n] ||= []).push(cb); setTimeout(()=>avisar(n)); },
+      async anadir(n,obj){ const d={...datos(n)}; d[Math.random().toString(36).slice(2)]=obj; guardar(n,d); },
+      async cambiar(n,id,obj){ const d={...datos(n)}; if(d[id]) d[id]={...d[id],...obj}; guardar(n,d); },
+      async borrar(n,id){ const d={...datos(n)}; delete d[id]; guardar(n,d); },
+      async poner(n,id,obj){ const d={...datos(n)}; d[id]={...(d[id]||{}),...obj}; guardar(n,d); }
+    };
+  }
+}
+function aviso(txt){ const a=$("#aviso"); a.textContent=txt; a.style.display=txt?"block":"none"; }
+
+/* ---------- estado ---------- */
+let lista=[], balda=[], memoria=new Map();
+let filtro="todo", editandoBalda=false;
+
+/* ---------- añadir productos ---------- */
+const NUMEROS={un:1,uno:1,una:1,dos:2,tres:3,cuatro:4,cinco:5,seis:6,siete:7,ocho:8,nueve:9,diez:10,once:11,doce:12};
+function interpretar(texto){
+  let t = " "+texto.toLowerCase().replace(/[.¡!¿?]/g," ")+" ";
+  let superDicho=null;
+  if (/\b(del?|en el|en)\s+(mercadona|mercado na)\b/.test(t) || /\bmercadona\b/.test(t)) superDicho="mercadona";
+  else if (/\b(del?|en el|en)\s+d[ií]a\b/.test(t)) superDicho="dia";
+  t = t.replace(/\b(a|en) la lista( de la compra)?\b/g," ")
+       .replace(/\b(del?|en el|en|para el|para)\s+(mercadona|mercado na|d[ií]a)\b/g," ")
+       .replace(/\bmercadona\b/g," ")
+       .replace(/^\s*(oye|vale|por favor)\b/g," ")
+       .replace(/\b(añade|añadir|añádeme|apunta|apuntar|apúntame|pon|ponme|agrega|agregar|compra|comprar|necesitamos|necesito|hace falta|hacen falta|falta|faltan|quiero|y también|también)\b/g," ")
+       .replace(/\bpor favor\b/g," ");
+  const trozos = t.split(/,|;|\by\b|\be\b|\bmás\b|\bmas\b/).map(s=>s.trim()).filter(Boolean);
+  return trozos.map(tr=>{
+    let cantidad=1;
+    const m = tr.match(/^(\d+|un|uno|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|once|doce)\s+(.+)$/);
+    if (m){ cantidad = NUMEROS[m[1]] || parseInt(m[1]) || 1; tr=m[2]; }
+    tr = tr.replace(/^(de|el|la|los|las|unos|unas)\s+/,"").trim();
+    return tr ? {nombre:tr, cantidad, super:superDicho} : null;
+  }).filter(Boolean);
+}
+
+async function anadirProducto({nombre, cantidad=1, super:sup=null, seccion=null, foto="", marca="", formato="", codigo=""}){
+  nombre = capital(nombre.trim());
+  if (!nombre) return null;
+  const n = norm(nombre);
+  const ya = lista.find(i=>!i.hecho && norm(i.nombre)===n);
+  if (ya){ return {repetido:true, nombre}; }
+  const info = buscarEnCatalogo(nombre);
+  const enBalda = balda.find(b=>norm(b.nombre)===n);
+  const supFinal = sup || (filtro!=="todo" ? filtro : null) || enBalda?.super || info.super || "cualquiera";
+  const tachado = lista.find(i=>i.hecho && norm(i.nombre)===n);
+  const extra = {foto: foto || enBalda?.foto || "", marca: marca || enBalda?.marca || "", formato: formato || enBalda?.formato || "", codigo: codigo || enBalda?.codigo || ""};
+  if (tachado){ await BD.cambiar("lista", tachado.id, {hecho:false, cantidad, super:supFinal, creado:Date.now(), ...extra}); return {nombre}; }
+  await BD.anadir("lista", {nombre, cantidad, super:supFinal, seccion: seccion || enBalda?.seccion || info.seccion, hecho:false, creado:Date.now(), ...extra});
+  return {nombre};
+}
+
+async function anadirTexto(texto){
+  const prods = interpretar(texto);
+  if (!prods.length) return;
+  const hechos=[], repes=[];
+  for (const p of prods){ const r = await anadirProducto(p); if(!r) continue; (r.repetido?repes:hechos).push(r.nombre); }
+  vibrar();
+  let msg = hechos.length ? "Apuntado: "+hechos.join(", ") : "";
+  if (repes.length) msg += (msg?". ":"") + "Ya estaba: "+repes.join(", ");
+  toast(msg);
+}
+
+/* ---------- pintar la lista ---------- */
+function pintarLista(){
+  const cont = $("#lista"); cont.replaceChildren();
+  const pend = lista.filter(i=>!i.hecho);
+  const cuenta = s => pend.filter(i=> s==="todo" || i.super===s || i.super==="cualquiera").length;
+  document.querySelectorAll("#filtro button").forEach(b=>{
+    b.classList.toggle("activo", b.dataset.super===filtro);
+    const c=cuenta(b.dataset.super); b.querySelector(".n").textContent = c?`(${c})`:"";
+  });
+  const g=$("#globo"); g.hidden=!pend.length; g.textContent=pend.length;
+
+  const visibles = lista.filter(i=> filtro==="todo" || i.super===filtro || i.super==="cualquiera");
+  if (!visibles.length){
+    cont.append(el("div",{class:"vacio"}, el("span",{class:"grande",text:"🎉"}),
+      filtro==="todo" ? "No hace falta nada.\nEscribe arriba o toca 🎤 para apuntar algo." :
+      `No hace falta nada del ${SUPERS[filtro]}.`));
+    cont.querySelector(".vacio").style.whiteSpace="pre-line";
+    return;
+  }
+  const porSec = {};
+  for (const i of visibles) (porSec[i.seccion in SEC ? i.seccion : "otros"] ||= []).push(i);
+  for (const s of Object.keys(porSec).sort((a,b)=>SEC[a].orden-SEC[b].orden)){
+    const items = porSec[s].sort((a,b)=> (a.hecho-b.hecho) || a.nombre.localeCompare(b.nombre,"es"));
+    cont.append(el("div",{class:"seccion",text:`${SEC[s].emo}  ${SEC[s].nombre}`}));
+    const grupo = el("div",{class:"grupo"});
+    for (const i of items){
+      const nom = el("span",{class:"nombre"});
+      if (i.cantidad>1) nom.append(el("span",{class:"cant",text:i.cantidad+" ×"}));
+      nom.append(document.createTextNode(i.nombre));
+      if (filtro==="todo" && i.super!=="cualquiera") nom.append(el("span",{class:"etiqueta "+i.super,text:SUPERS[i.super]}));
+      const det=[i.marca,i.formato].filter(Boolean).join(" · "); if (det) nom.append(el("span",{class:"detalle-prod",text:det}));
+      grupo.append(el("div",{class:"item"+(i.hecho?" hecho":"")},
+        el("button",{class:"toque","aria-label":(i.hecho?"Desmarcar ":"Tachar ")+i.nombre,
+          onclick:()=>{ vibrar(); BD.cambiar("lista",i.id,{hecho:!i.hecho}); }},
+          el("span",{class:"caja",text:i.hecho?"✓":""}), imgSegura(i.foto,"foto",""), nom),
+        el("button",{class:"mas","aria-label":"Opciones de "+i.nombre,text:"⋯",onclick:()=>abrirDetalles(i)})
+      ));
+    }
+    cont.append(grupo);
+  }
+  const hechos = visibles.filter(i=>i.hecho);
+  if (hechos.length){
+    cont.append(el("button",{class:"btn-ancho btn-quitar",text:`🧹 Quitar lo ya comprado (${hechos.length})`,
+      onclick:async()=>{ for(const i of hechos) await BD.borrar("lista",i.id); toast("Lista limpia"); }}));
+  }
+}
+
+/* ---------- ventana de detalles de un producto ---------- */
+function opciones(valores, actual, onSel){
+  const box = el("div",{class:"opciones"});
+  for (const [v,txt] of valores){
+    const b = el("button",{"data-v":v,class:v===actual?"activo":"",text:txt,onclick:()=>{
+      box.querySelectorAll("button").forEach(x=>x.classList.toggle("activo",x===b)); onSel(v); }});
+    box.append(b);
+  }
+  return box;
+}
+function selectorSeccion(actual, onSel){
+  const s = el("select",{onchange:e=>onSel(e.target.value)});
+  for (const [k,e,n] of SECCIONES){ const o=el("option",{value:k,text:`${e}  ${n}`}); if(k===actual) o.selected=true; s.append(o); }
+  return s;
+}
+function abrirModal(...hijos){ const m=$("#modal"); m.replaceChildren(...hijos); $("#modal-fondo").classList.add("abierto"); }
+function cerrarModal(){ $("#modal-fondo").classList.remove("abierto"); $("#modal").classList.remove("grande"); }
+$("#modal-fondo").addEventListener("click",e=>{ if(e.target.id==="modal-fondo") cerrarModal(); });
+
+function abrirDetalles(i){
+  const c = {cantidad:i.cantidad||1, super:i.super, seccion:i.seccion};
+  const num = el("span",{text:c.cantidad});
+  const enBalda = balda.some(b=>norm(b.nombre)===norm(i.nombre));
+  abrirModal(
+    el("h2",{text:i.nombre}),
+    el("label",{text:"Cuántos"}),
+    el("div",{class:"contador"},
+      el("button",{text:"−",onclick:()=>{ c.cantidad=Math.max(1,c.cantidad-1); num.textContent=c.cantidad; }}), num,
+      el("button",{text:"+",onclick:()=>{ c.cantidad++; num.textContent=c.cantidad; }})),
+    el("label",{text:"Dónde comprarlo"}),
+    opciones(Object.entries(SUPERS), c.super, v=>c.super=v),
+    el("label",{text:"Sección"}),
+    selectorSeccion(c.seccion, v=>c.seccion=v),
+    el("div",{class:"acciones"},
+      el("button",{class:"ok",text:"Guardar",onclick:async()=>{
+        await BD.cambiar("lista",i.id,c);
+        await BD.poner("memoria", norm(i.nombre).replace(/\//g," "), {nombre:i.nombre, seccion:c.seccion, super:c.super});
+        const b = balda.find(b=>norm(b.nombre)===norm(i.nombre));
+        if (b) await BD.cambiar("balda", b.id, {seccion:c.seccion, super:c.super});
+        cerrarModal(); }}),
+      enBalda ? null : el("button",{class:"secundario",text:"🧺 Guardar en la balda",onclick:async()=>{
+        await BD.anadir("balda",{nombre:i.nombre, seccion:c.seccion, super:c.super, foto:i.foto||"", marca:i.marca||"", formato:i.formato||"", codigo:i.codigo||""}); cerrarModal(); toast("Guardado en la balda"); }}),
+      el("button",{class:"peligro",text:"🗑 Borrar de la lista",onclick:()=>{ BD.borrar("lista",i.id); cerrarModal(); }}),
+      el("button",{class:"secundario",text:"Cancelar",onclick:cerrarModal})
+    )
+  );
+}
+
+/* ---------- balda ---------- */
+function pintarBalda(){
+  const cont = $("#balda"); cont.replaceChildren();
+  cont.classList.toggle("editando", editandoBalda);
+  $("#btn-editar-balda").textContent = editandoBalda ? "Listo" : "Editar";
+  const enLista = new Set(lista.filter(i=>!i.hecho).map(i=>norm(i.nombre)));
+  const porSec = {};
+  for (const b of balda) (porSec[b.seccion in SEC ? b.seccion : "otros"] ||= []).push(b);
+  const secs = Object.keys(porSec).sort((a,b)=>SEC[a].orden-SEC[b].orden);
+  if (!balda.length) cont.append(el("div",{class:"vacio"}, el("span",{class:"grande",text:"🧺"}),
+    "La balda está vacía. Pon aquí lo que compráis siempre."));
+  for (const s of secs){
+    cont.append(el("div",{class:"seccion",text:`${SEC[s].emo}  ${SEC[s].nombre}`}));
+    const rej = el("div",{class:"baldas"});
+    for (const b of porSec[s].sort((x,y)=>x.nombre.localeCompare(y.nombre,"es"))){
+      const esta = enLista.has(norm(b.nombre));
+      rej.append(el("button",{class:"bote"+(esta?" en-lista":""),"aria-label":b.nombre,onclick:async(e)=>{
+          if (e.target.classList.contains("quitar")) return;
+          if (editandoBalda) return;
+          if (esta){ toast(b.nombre+" ya está en la lista"); return; }
+          vibrar(); await anadirProducto({nombre:b.nombre, super:b.super, seccion:b.seccion});
+          toast("Apuntado: "+b.nombre); }},
+        imgSegura(b.foto,"foto-g","") || el("span",{class:"emo",text:SEC[s].emo}), el("span",{class:"nom",text:b.nombre}),
+        esta ? el("span",{class:"check",text:"✓"}) : null,
+        el("span",{class:"quitar",role:"button","aria-label":"Quitar "+b.nombre+" de la balda",text:"✕",onclick:(e)=>{
+          e.stopPropagation(); BD.borrar("balda",b.id); }})
+      ));
+    }
+    cont.append(rej);
+  }
+  const nuevo = el("div",{class:"baldas"}, el("button",{class:"bote nuevo",onclick:()=>abrirBuscador("balda")},
+    el("span",{class:"emo",text:"＋"}), el("span",{class:"nom",text:"Añadir a la balda"})));
+  nuevo.style.marginTop="16px";
+  cont.append(nuevo);
+}
+function abrirNuevoBalda(pre="", supPre="cualquiera"){
+  const c={super:supPre, seccion: pre ? buscarEnCatalogo(pre).seccion : "otros"};
+  let selSec;
+  const inp = el("input",{type:"text",value:pre,placeholder:"Ej: leche, pan de molde…",autocomplete:"off",
+    style:"width:100%;height:54px;border-radius:12px;border:2px solid #e4e2db;padding:0 12px",
+    oninput:e=>{ const s=buscarEnCatalogo(e.target.value).seccion; if(e.target.value.trim().length>2){ c.seccion=s; selSec.value=s; } }});
+  selSec = selectorSeccion(c.seccion, v=>c.seccion=v);
+  abrirModal(
+    el("h2",{text:"Añadir a la balda"}),
+    el("label",{text:"Producto"}), inp,
+    el("label",{text:"Dónde comprarlo"}), opciones(Object.entries(SUPERS), c.super, v=>c.super=v),
+    el("label",{text:"Sección"}), selSec,
+    el("div",{class:"acciones"},
+      el("button",{class:"ok",text:"Guardar en la balda",onclick:async()=>{
+        const n=capital(inp.value.trim()); if(!n){ inp.focus(); return; }
+        if (balda.some(b=>norm(b.nombre)===norm(n))){ toast("Ya está en la balda"); return; }
+        await BD.anadir("balda",{nombre:n, seccion:c.seccion, super:c.super}); cerrarModal(); toast("Guardado en la balda"); }}),
+      el("button",{class:"secundario",text:"Cancelar",onclick:cerrarModal}))
+  );
+  setTimeout(()=>inp.focus(),150);
+}
+$("#btn-editar-balda").addEventListener("click",()=>{ editandoBalda=!editandoBalda; pintarBalda(); });
+
+/* ---------- productos reales (Open Food Facts) ---------- */
+const MAPA_CAT = [
+  [/(canned|conserv|preserved|jams|en:sauces|condiments|spices|oils|vinegar|pastas|rices|legumes|cereals-and-potatoes|flours|salts|sugars|soups|olives|pickles|nuts|appetizers|crisps|chips)/,"despensa"],
+  [/(frozen)/,"congelados"],
+  [/(baby)/,"bebe"],
+  [/(pet-food|dog|cat-food)/,"mascotas"],
+  [/(cheeses|hams|charcuteries|sausages|prepared-meats|cured)/,"charcuteria"],
+  [/(milks|yogurts|dairy|dairies|desserts|creams|butters|eggs|fermented-milk|plant-based-milk)/,"lacteos"],
+  [/(fishes|seafood|fish)/,"pescado"],
+  [/(meats|poultry|beef|pork|chicken)/,"carne"],
+  [/(breads|bakery|toasts|tortillas)/,"pan"],
+  [/(coffees|teas|herbal|cocoa|breakfast|biscuits|cakes|pastries|chocolates|sweet-snacks|confectioneries|candies|honeys|spreads|jams)/,"desayuno"],
+  [/(beverages|waters|sodas|juices|beers|wines|alcoholic)/,"bebidas"],
+  [/(fruits|vegetables|salads|fresh)/,"fruta"]
+];
+function seccionDeCategorias(tags){
+  if (!tags || !tags.length) return null;
+  const t = tags.join(" ");
+  for (const [re,sec] of MAPA_CAT) if (re.test(t)) return sec;
+  return null;
+}
+const OFF_URL = "https://world.openfoodfacts.org/cgi/search.pl";
+const OFF_CAMPOS = "code,product_name,product_name_es,brands,quantity,image_front_small_url,image_front_url,categories_tags";
+let llamadas = [];
+function cacheLeer(k){ try{ const v=JSON.parse(localStorage.getItem(k)); if(v && Date.now()-v.t < 7*864e5) return v.d; }catch(e){} return null; }
+function cacheGuardar(k,d){ try{ localStorage.setItem(k, JSON.stringify({t:Date.now(), d})); }catch(e){} }
+async function buscarOFF(q, sup){
+  const clave = "off_"+sup+"_"+norm(q);
+  const enCache = cacheLeer(clave); if (enCache) return enCache;
+  const ahora = Date.now(); llamadas = llamadas.filter(t=>ahora-t<60000);
+  if (llamadas.length >= 9) throw new Error("limite");
+  llamadas.push(ahora);
+  const p = new URLSearchParams({search_terms:q, tagtype_0:"stores", tag_contains_0:"contains", tag_0:sup,
+    json:"1", page_size:"40", sort_by:"unique_scans_n", fields:OFF_CAMPOS, lc:"es", cc:"es", app_name:"PuedesIrAComprarHoy"});
+  const ctrl = new AbortController(); const to = setTimeout(()=>ctrl.abort(), 20000);
+  let r;
+  try { r = await fetch(OFF_URL+"?"+p, {signal:ctrl.signal}); } finally { clearTimeout(to); }
+  if (r.status===429) throw new Error("limite");
+  if (!r.ok) throw new Error("http "+r.status);
+  const j = await r.json();
+  const vistos = new Set();
+  const res = (j.products||[]).map(x=>{
+    const nombre = (x.product_name_es || x.product_name || "").trim();
+    return { codigo:x.code, nombre: nombre ? capital(nombre) : "",
+      marca: (x.brands||"").split(",")[0].trim(), formato: (x.quantity||"").trim(),
+      foto: x.image_front_small_url || x.image_front_url || "",
+      seccion: seccionDeCategorias(x.categories_tags) || buscarEnCatalogo(nombre).seccion };
+  }).filter(x=>{ const k=norm(x.nombre+"|"+x.marca+"|"+x.formato); if(!x.nombre||vistos.has(k)) return false; vistos.add(k); return true; });
+  cacheGuardar(clave, res);
+  return res;
+}
+function imgSegura(url, clase, alt){
+  if (!url || !/^https:\/\//.test(url)) return null;
+  const im = el("img",{class:clase, src:url, alt:alt||"", loading:"lazy", referrerpolicy:"no-referrer"});
+  im.addEventListener("error",()=>im.remove());
+  return im;
+}
+const CHIPS = ["Leche","Yogures","Huevos","Pan de molde","Queso","Jamón","Pollo","Atún","Pasta","Arroz","Aceite","Galletas","Café","Cereales","Zumo","Agua","Cerveza","Tomate frito","Pizza","Helado"];
+
+function abrirBuscador(modo="lista", textoInicial=""){
+  const st = { modo, sup: filtro==="dia" ? "dia" : "mercadona", q:textoInicial, puestos:new Set(), temp:null };
+  const titulo = modo==="balda" ? "Añadir a la balda" : "Buscar productos";
+  const inp = el("input",{type:"search",placeholder:"Ej: leche, yogur griego, Hacendado…",value:textoInicial,
+    autocomplete:"off", enterkeyhint:"search", "aria-label":"Buscar producto"});
+  const res = el("div",{class:"resultados"});
+  const supBox = opciones([["mercadona","Mercadona"],["dia","Dia"]], st.sup, v=>{ st.sup=v; if(st.q) lanzar(); });
+  const chips = el("div",{class:"chips"}, ...CHIPS.map(c=>el("button",{text:c,onclick:()=>{ inp.value=c; lanzar(); }})));
+
+  function botonTalCual(){
+    const q = inp.value.trim(); if (!q) return null;
+    return el("button",{class:"tal-cual",onclick:async()=>{
+      if (modo==="balda"){ cerrarModal(); abrirNuevoBalda(q, st.sup); return; }
+      await anadirTexto(q); cerrarModal(); }},
+      document.createTextNode("✏️  Apuntar «"), el("b",{text:q}), document.createTextNode("» sin elegir marca"));
+  }
+  function pintar(prods, msg){
+    res.replaceChildren();
+    const tc = botonTalCual(); if (tc) res.append(tc);
+    if (msg){ res.append(el("div",{class:"estado",text:msg})); }
+    if (prods && prods.length){
+      const rej = el("div",{class:"rejilla"});
+      for (const p of prods){
+        const yaEsta = st.puestos.has(p.codigo) || (modo==="balda" ? balda : lista_pend()).some(x=>norm(x.nombre)===norm(p.nombre));
+        const tarjeta = el("button",{class:"prod"+(yaEsta?" puesto":""),"aria-label":"Añadir "+p.nombre});
+        const im = imgSegura(p.foto,"",p.nombre);
+        tarjeta.append(im || el("div",{class:"sinfoto",text:SEC[p.seccion]?.emo||"📦"}));
+        if (im) im.addEventListener("error",()=>tarjeta.prepend(el("div",{class:"sinfoto",text:SEC[p.seccion]?.emo||"📦"})));
+        tarjeta.append(el("span",{class:"pn",text:p.nombre}),
+          el("span",{class:"pm",text:[p.marca,p.formato].filter(Boolean).join(" · ")}),
+          el("span",{class:"pmas",text:yaEsta?"✓ Apuntado":"+ Apuntar"}));
+        tarjeta.addEventListener("click",async()=>{
+          if (tarjeta.classList.contains("puesto")) return;
+          vibrar();
+          if (modo==="balda"){
+            await BD.anadir("balda",{nombre:p.nombre, seccion:p.seccion, super:st.sup, foto:p.foto, marca:p.marca, formato:p.formato, codigo:p.codigo});
+            toast("En la balda: "+p.nombre);
+          } else {
+            const r = await anadirProducto({nombre:p.nombre, super:st.sup, seccion:p.seccion, foto:p.foto, marca:p.marca, formato:p.formato, codigo:p.codigo});
+            toast(r?.repetido ? "Ya estaba en la lista" : "Apuntado: "+p.nombre);
+          }
+          st.puestos.add(p.codigo); tarjeta.classList.add("puesto"); tarjeta.querySelector(".pmas").textContent="✓ Apuntado";
+        });
+        rej.append(tarjeta);
+      }
+      res.append(rej);
+    }
+    res.append(el("div",{class:"creditos"}, document.createTextNode("Productos y fotos: "),
+      el("a",{href:"https://es.openfoodfacts.org",target:"_blank",rel:"noopener",text:"Open Food Facts"}),
+      document.createTextNode(" (base de datos abierta, ODbL)")));
+  }
+  let turno=0;
+  async function lanzar(){
+    const q = inp.value.trim(); st.q=q;
+    if (q.length<2){ pintar(null, "Escribe lo que buscas o toca una de las sugerencias."); return; }
+    const mio = ++turno;
+    pintar(null, "Buscando en "+SUPERS[st.sup]+"…");
+    try{
+      const r = await buscarOFF(q, st.sup);
+      if (mio!==turno) return;
+      pintar(r, r.length ? null : `No encuentro «${q}» en ${SUPERS[st.sup]}. Prueba con otra palabra, o apúntalo sin marca con el botón de arriba.`);
+    }catch(e){
+      if (mio!==turno) return;
+      pintar(null, e.message==="limite" ? "Has buscado muchas veces seguidas. Espera un minuto y vuelve a probar."
+        : "No he podido buscar ahora mismo. Comprueba que tienes internet. (Dentro de la vista previa de Claude la búsqueda no funciona: funciona en la app instalada.)");
+    }
+  }
+  let deb;
+  inp.addEventListener("input",()=>{ clearTimeout(deb); deb=setTimeout(()=>{ if(inp.value.trim().length>=3) lanzar(); }, 1100); });
+  inp.addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); clearTimeout(deb); lanzar(); inp.blur(); } });
+
+  const m = $("#modal"); m.classList.add("grande");
+  abrirModal(
+    el("div",{class:"cab"},
+      el("button",{class:"cerrar","aria-label":"Cerrar",text:"✕",onclick:cerrarModal}),
+      el("h2",{text:titulo}),
+      supBox,
+      el("div",{class:"busca"}, inp, el("button",{text:"Buscar",onclick:()=>{ clearTimeout(deb); lanzar(); }})),
+      chips),
+    res
+  );
+  if (textoInicial) lanzar(); else pintar(null, "Escribe lo que buscas o toca una de las sugerencias.");
+}
+const lista_pend = () => lista.filter(i=>!i.hecho);
+$("#btn-buscar").addEventListener("click",()=>abrirBuscador("lista"));
+
+/* ---------- caja de texto y sugerencias ---------- */
+const entrada=$("#entrada"), sug=$("#sugerencias");
+function enviar(){ const v=entrada.value.trim(); if(!v) return; anadirTexto(v); entrada.value=""; sug.style.display="none"; }
+$("#btn-anadir").addEventListener("click",()=>{ if(entrada.value.trim()) enviar(); else entrada.focus(); });
+entrada.addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); enviar(); entrada.blur(); } });
+entrada.addEventListener("input",()=>{
+  const q=norm(entrada.value);
+  sug.replaceChildren();
+  if (q.length<2 || /,| y /.test(entrada.value)){ sug.style.display="none"; return; }
+  const vistos=new Set(), res=[];
+  const fuentes=[...balda.map(b=>({...b,deBalda:true})), ...[...memoria.values()], ...CATALOGO];
+  for (const p of fuentes){
+    const pn=norm(p.nombre); if(vistos.has(pn)) continue;
+    if (pn.startsWith(q) || pn.includes(" "+q)){ vistos.add(pn); res.push(p); }
+    if (res.length>=6) break;
+  }
+  for (const p of res){
+    sug.append(el("button",{onmousedown:e=>e.preventDefault(),onclick:()=>{
+        anadirTexto(p.nombre); entrada.value=""; sug.style.display="none"; }},
+      el("span",{text:SEC[p.seccion]?.emo||"📦"}), el("span",{text:capital(p.nombre)}),
+      el("small",{text:p.deBalda?"de la balda":SEC[p.seccion]?.nombre||""})));
+  }
+  const texto=entrada.value.trim();
+  sug.append(el("button",{onmousedown:e=>e.preventDefault(),onclick:()=>{ entrada.value=""; sug.style.display="none"; abrirBuscador("lista", texto); }},
+    el("span",{text:"🔎"}), el("span",{text:"Buscar «"+texto+"» con fotos"})));
+  sug.style.display="block";
+});
+entrada.addEventListener("blur",()=>setTimeout(()=>sug.style.display="none",150));
+
+/* ---------- micrófono ---------- */
+const Reco = window.SpeechRecognition || window.webkitSpeechRecognition;
+const micro=$("#micro"); let reco=null, escuchando=false;
+micro.addEventListener("click",()=>{
+  if (!Reco){
+    entrada.focus();
+    toast("Pulsa el 🎤 del teclado del iPhone y dilo: «leche, pan y huevos»");
+    return;
+  }
+  if (escuchando){ reco.stop(); return; }
+  reco = new Reco(); reco.lang="es-ES"; reco.interimResults=false; reco.maxAlternatives=1;
+  reco.onstart=()=>{ escuchando=true; micro.classList.add("escuchando"); toast("Te escucho… di por ejemplo «leche y huevos»"); };
+  reco.onend=()=>{ escuchando=false; micro.classList.remove("escuchando"); };
+  reco.onerror=e=>{ escuchando=false; micro.classList.remove("escuchando");
+    if (e.error==="not-allowed"||e.error==="service-not-allowed"){ entrada.focus(); toast("No tengo permiso del micro. Usa el 🎤 del teclado."); }
+    else if (e.error==="no-speech") toast("No te he oído. Prueba otra vez."); };
+  reco.onresult=e=>{ const txt=e.results[0][0].transcript; anadirTexto(txt); };
+  try{ reco.start(); }catch(err){ entrada.focus(); toast("Usa el 🎤 del teclado del iPhone"); }
+});
+
+/* ---------- filtro y pestañas ---------- */
+$("#filtro").addEventListener("click",e=>{ const b=e.target.closest("button"); if(!b) return; filtro=b.dataset.super; pintarLista(); });
+document.querySelectorAll("nav button").forEach(b=>b.addEventListener("click",()=>{
+  document.querySelectorAll("nav button").forEach(x=>x.classList.toggle("activo",x===b));
+  document.querySelectorAll(".vista").forEach(v=>v.classList.toggle("activa", v.id==="vista-"+b.dataset.vista));
+  window.scrollTo(0,0);
+}));
+
+/* ---------- arranque ---------- */
+pintarLista(); pintarBalda();
+try{
+  await iniciarBD();
+  BD.escuchar("lista", d=>{ lista=d; pintarLista(); pintarBalda(); });
+  BD.escuchar("balda", d=>{ balda=d; pintarBalda(); });
+  BD.escuchar("memoria", d=>{ memoria=new Map(d.map(x=>[x.id,{nombre:x.nombre||x.id,seccion:x.seccion,super:x.super}])); });
+}catch(e){ console.error(e); aviso("No se ha podido abrir la lista. Revisa la conexión a internet."); }
+</script>
+</body>
+</html>
