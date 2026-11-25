@@ -557,29 +557,60 @@ const OFF_CAMPOS = "code,product_name,product_name_es,brands,quantity,image_fron
 let llamadas = [];
 function cacheLeer(k){ try{ const v=JSON.parse(localStorage.getItem(k)); if(v && Date.now()-v.t < 7*864e5) return v.d; }catch(e){} return null; }
 function cacheGuardar(k,d){ try{ localStorage.setItem(k, JSON.stringify({t:Date.now(), d})); }catch(e){} }
-async function buscarOFF(q, sup){
-  const clave = "off_"+sup+"_"+norm(q);
-  const enCache = cacheLeer(clave); if (enCache) return enCache;
+function limpiarMarca(b){
+  const v = Array.isArray(b) ? b[0] : (b||"").split(",")[0];
+  return v ? capital(String(v).replace(/^[a-z]{2}:/,"").replace(/-/g," ").trim()) : "";
+}
+function aProducto(x){
+  const nombre = (x.product_name_es || x.product_name || "").trim();
+  return { codigo:String(x.code||""), nombre: nombre ? capital(nombre) : "",
+    marca: limpiarMarca(x.brands), formato: (x.quantity||"").trim(),
+    foto: x.image_front_small_url || x.image_front_url || "",
+    seccion: seccionDeCategorias(x.categories_tags) || buscarEnCatalogo(nombre).seccion };
+}
+async function pedir(url, ms=15000){
+  const ctrl = new AbortController(); const to = setTimeout(()=>ctrl.abort(), ms);
+  try { const r = await fetch(url, {signal:ctrl.signal}); if(!r.ok) throw new Error("http "+r.status); return await r.json(); }
+  finally { clearTimeout(to); }
+}
+// Buscador nuevo de Open Food Facts (rápido y con buena relevancia)
+async function buscarNuevo(q, sup){
+  const limpio = q.replace(/["':()\[\]{}\\]/g," ").trim();
+  const p = new URLSearchParams({q: `${limpio} stores:"${sup}"`, page_size:"60", langs:"es",
+    fields:"code,product_name,product_name_es,brands,quantity,image_front_small_url,image_front_url,categories_tags"});
+  const j = await pedir("https://search.openfoodfacts.org/search?"+p);
+  return (j.hits||[]).map(aProducto);
+}
+// Buscador clásico (de reserva; se satura si se usa muy seguido)
+async function buscarClasico(q, sup){
   const ahora = Date.now(); llamadas = llamadas.filter(t=>ahora-t<60000);
-  if (llamadas.length >= 9) throw new Error("limite");
-  llamadas.push(ahora);
+  if (llamadas.length >= 8) throw new Error("limite");
   const p = new URLSearchParams({search_terms:q, tagtype_0:"stores", tag_contains_0:"contains", tag_0:sup,
-    json:"1", page_size:"40", sort_by:"unique_scans_n", fields:OFF_CAMPOS, lc:"es", cc:"es", app_name:"PuedesIrAComprarHoy"});
-  const ctrl = new AbortController(); const to = setTimeout(()=>ctrl.abort(), 20000);
-  let r;
-  try { r = await fetch(OFF_URL+"?"+p, {signal:ctrl.signal}); } finally { clearTimeout(to); }
-  if (r.status===429) throw new Error("limite");
-  if (!r.ok) throw new Error("http "+r.status);
-  const j = await r.json();
+    json:"1", page_size:"50", fields:OFF_CAMPOS, lc:"es", cc:"es"});
+  llamadas.push(Date.now());
+  const j = await pedir(OFF_URL+"?"+p, 7000);
+  return (j.products||[]).map(aProducto);
+}
+async function buscarOFF(q, sup, completo=true){
+  const clave = "off2_"+sup+"_"+norm(q);
+  const enCache = cacheLeer(clave); if (enCache) return enCache;
+  let res = [], fallos = 0;
+  try { res = await buscarNuevo(q, sup); } catch(e){ fallos++; }
+  if (completo && res.length < 12){
+    try { res = res.concat(await buscarClasico(q, sup)); } catch(e){ fallos++; }
+  }
+  if (fallos===2 || (fallos===1 && !completo)) throw new Error("red");
   const vistos = new Set();
-  const res = (j.products||[]).map(x=>{
-    const nombre = (x.product_name_es || x.product_name || "").trim();
-    return { codigo:x.code, nombre: nombre ? capital(nombre) : "",
-      marca: (x.brands||"").split(",")[0].trim(), formato: (x.quantity||"").trim(),
-      foto: x.image_front_small_url || x.image_front_url || "",
-      seccion: seccionDeCategorias(x.categories_tags) || buscarEnCatalogo(nombre).seccion };
-  }).filter(x=>{ const k=norm(x.nombre+"|"+x.marca+"|"+x.formato); if(!x.nombre||vistos.has(k)) return false; vistos.add(k); return true; });
-  cacheGuardar(clave, res);
+  res = res.filter(x=>{ const k = x.codigo || norm(x.nombre+"|"+x.marca+"|"+x.formato);
+    if(!x.nombre||vistos.has(k)) return false; vistos.add(k); return true; });
+  const pals = norm(q).split(" ").filter(w=>w.length>1).map(w=>w.replace(/(es|s)$/,""));
+  const nota = x => { const n=norm(x.nombre); let v=0;
+    pals.forEach((w,i)=>{ if(n.startsWith(w)) v+= i===0?8:3; else if(new RegExp("(^|\\s)"+w).test(n)) v+=4; else if(n.includes(w)) v+=1; });
+    if (x.foto) v+=1; return v; };
+  res.forEach((x,i)=>x._o=i);
+  res.sort((a,b)=> nota(b)-nota(a) || a._o-b._o);
+  res.forEach(x=>delete x._o);
+  if (res.length) cacheGuardar(clave, res);
   return res;
 }
 function imgSegura(url, clase, alt){
@@ -642,23 +673,23 @@ function abrirBuscador(modo="lista", textoInicial=""){
       document.createTextNode(" (base de datos abierta, ODbL)")));
   }
   let turno=0;
-  async function lanzar(){
+  async function lanzar(completo=true){
     const q = inp.value.trim(); st.q=q;
     if (q.length<2){ pintar(null, "Escribe lo que buscas o toca una de las sugerencias."); return; }
     const mio = ++turno;
     pintar(null, "Buscando en "+SUPERS[st.sup]+"…");
     try{
-      const r = await buscarOFF(q, st.sup);
+      const r = await buscarOFF(q, st.sup, completo);
       if (mio!==turno) return;
       pintar(r, r.length ? null : `No encuentro «${q}» en ${SUPERS[st.sup]}. Prueba con otra palabra, o apúntalo sin marca con el botón de arriba.`);
     }catch(e){
       if (mio!==turno) return;
       pintar(null, e.message==="limite" ? "Has buscado muchas veces seguidas. Espera un minuto y vuelve a probar."
-        : "No he podido buscar ahora mismo. Comprueba que tienes internet. (Dentro de la vista previa de Claude la búsqueda no funciona: funciona en la app instalada.)");
+        : "No he podido buscar ahora mismo. Comprueba que tienes internet y vuelve a pulsar Buscar.");
     }
   }
   let deb;
-  inp.addEventListener("input",()=>{ clearTimeout(deb); deb=setTimeout(()=>{ if(inp.value.trim().length>=3) lanzar(); }, 1100); });
+  inp.addEventListener("input",()=>{ clearTimeout(deb); deb=setTimeout(()=>{ if(inp.value.trim().length>=3) lanzar(false); }, 700); });
   inp.addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); clearTimeout(deb); lanzar(); inp.blur(); } });
 
   const m = $("#modal"); m.classList.add("grande");
